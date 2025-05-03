@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const validator = require("validator")
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const AppError = require("../utils/appError");
 const availabilitySchema = new mongoose.Schema({
     day: { type: String, enum: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], required: true },
