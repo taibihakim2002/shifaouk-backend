@@ -5,8 +5,14 @@ const consultationRouter = require("./routes/consultationRoutes");
 const authRouter = require("./routes/authRoutes")
 const AppError = require("./utils/appError");
 const globalErrorHandler = require("./controllers/errorController");
+const authController = require("./controllers/authController");
+const cookieParser = require("cookie-parser");
 const app = express()
 
+
+app.use(authController.onlyFrontend)
+
+app.use(cookieParser());
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan("dev"))
 }

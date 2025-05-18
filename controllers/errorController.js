@@ -12,11 +12,11 @@ const sendErrorDev = (err, req, res, next) => {
 const sendErrorPro = (err, req, res, next) => {
     // if there are operational error we send error to client unless programming errors 
     if (err?.isOperational) {
-        return res.status(err.statusCode).json({ status: err.status, message: err.message })
+        return res.status(err.statusCode).json({ status: err.status, message: err.message, errorCode: err.errorCode })
     } else {
         console.error("ERROR 🔥", err)
         return res.status(500).json({
-            status: "error", message: "Something went wrong",
+            status: "error", message: "Something went wrong", errorCode: "unknownError"
         })
     }
     // programming error don't send details to client
