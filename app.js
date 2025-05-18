@@ -18,11 +18,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 
-app.use(cors({
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST'],
-    credentials: true
-}));
+app.use(cors({ origin: 'https://shifaouk.netlify.app' }));
 // app.use(express.static("./public"))
 app.use(express.json());
 app.use("/api/v1/users", userRouter)
