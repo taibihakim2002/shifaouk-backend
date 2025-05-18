@@ -8,7 +8,7 @@ const globalErrorHandler = require("./controllers/errorController");
 const authController = require("./controllers/authController");
 const cookieParser = require("cookie-parser");
 const app = express()
-
+const cors = require('cors');
 
 app.use(authController.onlyFrontend)
 
@@ -17,6 +17,12 @@ if (process.env.NODE_ENV === 'development') {
     app.use(morgan("dev"))
 }
 
+
+app.use(cors({
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true
+}));
 // app.use(express.static("./public"))
 app.use(express.json());
 app.use("/api/v1/users", userRouter)
