@@ -7,9 +7,13 @@ const AppError = require("./utils/appError");
 const globalErrorHandler = require("./controllers/errorController");
 const authController = require("./controllers/authController");
 const cookieParser = require("cookie-parser");
-const app = express()
 const cors = require('cors');
+const app = express()
 
+app.use(cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+}));
 app.use(authController.onlyFrontend)
 
 app.use(cookieParser());
@@ -18,7 +22,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 
-app.use(cors({ origin: 'https://shifaouk.netlify.app' }));
+
 // app.use(express.static("./public"))
 app.use(express.json());
 app.use("/api/v1/users", userRouter)

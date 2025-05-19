@@ -13,6 +13,8 @@ process.on("uncaughtException", (err) => {
 
 const app = require("./app");
 
+
+
 const db = process.env.DB_STRING.replace("<DB_PASSWORD>", process.env.DB_PASSWORD)
 
 
