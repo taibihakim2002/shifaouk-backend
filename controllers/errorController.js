@@ -1,3 +1,4 @@
+const errorCodes = require("../constants/errorCodes")
 const AppError = require("../utils/appError")
 const sendErrorDev = (err, req, res, next) => {
     if (err?.isOperational) {
@@ -10,38 +11,72 @@ const sendErrorDev = (err, req, res, next) => {
     }
 }
 const sendErrorPro = (err, req, res, next) => {
-    // if there are operational error we send error to client unless programming errors 
     if (err?.isOperational) {
-        return res.status(err.statusCode).json({ status: err.status, message: err.message, errorCode: err.errorCode })
+        return res.status(err.statusCode).json({ status: err.status, message: err.message, code: err.code })
     } else {
-        console.error("ERROR 🔥", err)
+
         return res.status(500).json({
-            status: "error", message: "Something went wrong", errorCode: "unknownError"
+            status: "error", message: "Something went wrong", code: 1999
         })
     }
-    // programming error don't send details to client
 }
 
 module.exports = (err, req, res, next) => {
+    console.log(err)
     if (process.env.NODE_ENV === "development") {
-        sendErrorDev(err, req, res, next)
+        sendErrorDev(err, req, res, next);
     } else if (process.env.NODE_ENV === "production") {
         let error;
-        // Handle the db error with type castError
-        if (err.name === 'CastError') {
-            error = new AppError(`Invalid ${err.path}: ${err.value}`, 404)
-        }
-        // Handle the db error with type Duplicated error
+        if (err.name === "MulterError") {
+            let message = "Error when uploading files";
+            let code = errorCodes.UPLOAD_ERROR;
 
-        if (err.code === 11000) {
-            const field = Object.keys(err.errorResponse.keyPattern)[0]
-            const keyValue = err.errorResponse.keyValue[field]
-            error = new AppError(`The ${field}: ${keyValue} already exists , Please enter differente one , `, 404)
+            if (err.code === "LIMIT_FILE_SIZE") {
+                message = "File size is too large";
+                code = errorCodes.UPLOAD_FILE_TOO_LARGE;
+            } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+                console.log(err)
+                message = "Unexpected file field";
+                code = errorCodes.UPLOAD_UNEXPECTED_FIELD;
+            }
+
+            error = new AppError(message, 400, code);
         }
-        // Handle the db error with type validation error
-        if (err.name === "ValidationError") {
-            error = new AppError(err.message, 404)
+
+        // 🔴 Custom file filter error (e.g., unsupported MIME type)
+        else if (err.message?.includes("نوع الملف غير مدعوم")) {
+            error = new AppError(err.message, 400, errorCodes.UPLOAD_UNSUPPORTED_TYPE);
         }
-        sendErrorPro(error, req, res, next)
+
+        // 🟡 MongoDB Cast Error (invalid ObjectId)
+        else if (err.name === "CastError") {
+            error = new AppError(`Invalid ${err.path}: ${err.value}`, 404, errorCodes.VALIDATION_INVALID_ID);
+        }
+
+        // 🔵 MongoDB Duplicate Key Error (email or phone)
+        else if (err.code === 11000) {
+            const field = Object.keys(err.keyPattern)[0];
+            const value = err.keyValue[field];
+
+            if (field === "email") {
+                error = new AppError(`The email: ${value} already exists. Please use a different one.`, 404, errorCodes.VALIDATION_DUPLICATE_EMAIL);
+            } else if (field === "phone") {
+                error = new AppError(`The phone: ${value} already exists. Please use a different one.`, 404, errorCodes.VALIDATION_DUPLICATE_PHONE);
+            } else {
+                error = new AppError(`The ${field}: ${value} already exists. Please use a different one.`, 404, errorCodes.VALIDATION_DUPLICATE_VALUE);
+            }
+        }
+
+        // 🟣 Mongoose Validation Error
+        else if (err.name === "ValidationError") {
+            error = new AppError(err.message, 404, errorCodes.VALIDATION_INVALID_DATA);
+        }
+
+        // ⚫ Unknown or unexpected error
+        else {
+            error = err;
+        }
+
+        sendErrorPro(error, req, res, next);
     }
 }

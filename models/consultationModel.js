@@ -1,4 +1,5 @@
-const { default: mongoose } = require("mongoose")
+const { default: mongoose } = require("mongoose");
+const Counter = require("./counterModel");
 
 const consultationSchema = new mongoose.Schema({
     doctorId: {
@@ -10,6 +11,11 @@ const consultationSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: [true, "Patient Id is required"]
+    },
+    consultationId: {
+        type: Number,
+        unique: true,
+        sparse: true
     },
     type: {
         type: String,
@@ -45,6 +51,23 @@ const consultationSchema = new mongoose.Schema({
 }, {
     timestamps: true
 })
+
+
+consultationSchema.pre("save", async function (next) {
+    if (this.isNew && !this.consultationId) {
+        try {
+            const counter = await Counter.findOneAndUpdate(
+                { name: "consultationId" },
+                { $inc: { seq: 1 } },
+                { new: true, upsert: true }
+            );
+            this.consultationId = counter.seq;
+        } catch (err) {
+            return next(err);
+        }
+    }
+    next();
+});
 
 
 const Consultation = mongoose.model("Consultation", consultationSchema)

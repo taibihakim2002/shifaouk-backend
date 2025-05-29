@@ -1,5 +1,6 @@
 const express = require("express");
-const { login, register } = require("../controllers/authController");
+const { login, registerPatient, registerDoctor, logout, onlyFrontend } = require("../controllers/authController");
+const uploadDoctorFiles = require("../config/multer/doctorUpload");
 
 const router = express.Router();
 
@@ -8,9 +9,21 @@ const router = express.Router();
 
 
 
-router.post("/login", login)
-router.post("/register", register)
+router.post("/login", onlyFrontend, login)
+router.post("/register/patient", onlyFrontend, registerPatient)
+router.post(
+    "/register/doctor",
+    onlyFrontend,
 
+    uploadDoctorFiles.fields([
+        { name: "profile", maxCount: 1 },
+        { name: "bac", maxCount: 1 },
+        { name: "specCar", maxCount: 1 },
+        { name: "profession", maxCount: 1 },
+    ]),
+    registerDoctor
+);
+router.post("/logout", onlyFrontend, logout)
 
 
 module.exports = router;

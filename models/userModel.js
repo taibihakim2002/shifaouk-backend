@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const validator = require("validator")
 const bcrypt = require("bcryptjs");
 const AppError = require("../utils/appError");
+const Counter = require("./counterModel");
 const availabilitySchema = new mongoose.Schema({
     day: { type: String, enum: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], required: true },
     from: { type: String, required: true }, // "09:00"
@@ -9,6 +10,11 @@ const availabilitySchema = new mongoose.Schema({
 }, { _id: false });
 
 const doctorProfileSchema = new mongoose.Schema({
+    requestId: {
+        type: Number,
+        unique: true,
+        sparse: true // لأنه خاص بالأطباء فقط
+    },
     specialization: { type: String, required: true },
     licenseDocuments: { type: [String], default: [] },
     experienceYears: { type: Number, min: 0 },
@@ -19,6 +25,7 @@ const doctorProfileSchema = new mongoose.Schema({
     availability: { type: [availabilitySchema], default: [] },
     approved: { type: Boolean, default: false },
     clinicAddress: String,
+    workplace: String,
     doctorBio: String,
 }, { _id: false });
 
@@ -51,14 +58,14 @@ const userSchema = new mongoose.Schema({
         first: {
             type: String,
             minLength: [2, "First name must be at least 2 characters long"],
-            maxLength: [10, "First name must not exceed 10 characters"],
+            maxLength: [20, "First name must not exceed 10 characters"],
             required: true
         },
         second: {
             type: String,
             minLength: [2, "Second name must be at least 2 characters long"],
-            maxLength: [10, "Second name must not exceed 10 characters"],
-            // required: true
+            maxLength: [20, "Second name must not exceed 10 characters"],
+            required: true
         },
     },
     email: {
@@ -74,11 +81,13 @@ const userSchema = new mongoose.Schema({
         unique: true,
         validate: {
             validator: (value) => {
-                return /^[0-9]{8,15}$/.test(value)
+                return /^0[567][0-9]{8}$/.test(value)
             },
             message: `Please enter a valid Phone Number !`
         }
     },
+    state: String,
+    city: String,
     password: {
         type: String,
         required: true,
@@ -112,6 +121,23 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 })
 
+
+
+userSchema.pre("save", async function (next) {
+    if (this.isNew && this.role === "doctor" && !this.doctorProfile?.requestId) {
+        try {
+            const counter = await Counter.findOneAndUpdate(
+                { name: "doctorRequestId" },
+                { $inc: { seq: 1 } },
+                { new: true, upsert: true }
+            );
+            this.doctorProfile.requestId = counter.seq;
+        } catch (err) {
+            return next(err);
+        }
+    }
+    next();
+});
 
 userSchema.pre("save", function (next) {
     if (!this.isModified("role")) return;

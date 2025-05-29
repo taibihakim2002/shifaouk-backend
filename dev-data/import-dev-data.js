@@ -20,7 +20,10 @@ const importData = async () => {
     try {
         switch (process.argv[3]) {
             case 'users':
-                await User.insertMany(dataLocal);
+                dataLocal.map(async (userData) => {
+                    const user = new User(userData);
+                    return await user.save();  // هذا ينفذ validation ويحفظ المستند
+                })
                 break;
             case 'consultations':
                 await Consultation.insertMany(dataLocal);

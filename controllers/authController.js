@@ -2,7 +2,10 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync")
-const bcrypt = require("bcryptjs")
+const errorCodes = require("../constants/errorCodes");
+const path = require("path");
+const fs = require("fs");
+const specializations = require("../constants/specializations");
 
 const signToken = id => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -13,8 +16,6 @@ const signToken = id => {
 
 const createSendToken = (user, statusCode, res) => {
     const token = signToken(user._id);
-
-
     const cookieOptions = {
         httpOnly: true,
         // secure: process.env.NODE_ENV === 'production',
@@ -24,9 +25,7 @@ const createSendToken = (user, statusCode, res) => {
     };
 
     res.cookie('jwt', token, cookieOptions);
-
     user.password = undefined;
-
     res.status(statusCode).json({
         status: 'success',
         message: 'You are logged in',
@@ -37,27 +36,123 @@ const createSendToken = (user, statusCode, res) => {
 
 exports.login = catchAsync(async (req, res, next) => {
     const { email, password } = req.body;
-
-
     if (!email || !password) {
         return next(new AppError('Please provide email and password', 400));
     }
-
-
     const user = await User.findOne({ email }).select('+password');
-    if (!user || !(await user.correctPassword(password, user.password))) {
-        return next(new AppError('Incorrect email or password', 401));
-    }
 
+    if (!user || !(await user.correctPassword(password, user.password))) {
+        return next(new AppError('Incorrect email or password', 401, errorCodes.AUTH_INVALID_CREDENTIALS));
+    }
+    if (user.role === "doctor" && !user.doctorProfile.approved) {
+        return next(new AppError("your account is not approved", 401, errorCodes.BUSINESS_DOCTOR_ACCOUNT_NOT_APPROVED))
+    }
     createSendToken(user, 200, res);
 });
-exports.register = catchAsync(async (req, res, next) => {
+
+exports.registerPatient = catchAsync(async (req, res, next) => {
     const newUser = { ...req.body }
     newUser.role = "patient";
     const user = await User.create(newUser);
-
     createSendToken(user, 201, res);
 });
+
+
+
+
+exports.registerDoctor = catchAsync(async (req, res, next) => {
+    const {
+        name,
+        prename,
+        email,
+        phone,
+        password,
+        state,
+        city,
+        spec,
+        exper,
+        workplace,
+        pio,
+    } = req.body;
+
+    const files = req.files;
+
+    const getPath = (key) => {
+        if (!files[key]) return "";
+        return files[key][0].path.replace(/\\/g, "/");  // استبدال \ بـ /
+    };
+
+    try {
+
+
+        const arabicSpec = specializations.find((s) => s.value === spec)?.label || spec;
+        const newDoctor = await User.create({
+            role: "doctor",
+            fullName: {
+                first: name,
+                second: prename,
+            },
+            email,
+            phone,
+            state,
+            city,
+            password,
+            profileImage: getPath("profile"),
+            doctorProfile: {
+
+                specialization: arabicSpec,
+                experienceYears: Number(exper),
+                workplace: workplace,
+                doctorBio: pio,
+                licenseDocuments: [
+                    getPath("bac"),
+                    getPath("specCar"),
+                    getPath("profession"),
+                ].filter(Boolean),
+            }
+        });
+
+        res.status(201).json({
+            status: "success",
+            message: "Doctor successfully registered",
+            data: newDoctor,
+        });
+
+    } catch (error) {
+        // محاولة حذف مجلد الملفات فقط إذا تم رفع ملفات
+        const anyFilePath = files ? (
+            files.profile?.[0]?.path ||
+            files.bac?.[0]?.path ||
+            files.specCar?.[0]?.path ||
+            files.profession?.[0]?.path ||
+            null
+        ) : null;
+
+        if (anyFilePath) {
+            const folderPath = path.dirname(anyFilePath);
+            try {
+                if (fs.existsSync(folderPath)) {
+                    await fs.promises.rm(folderPath, { recursive: true, force: true });
+
+                }
+            } catch (deleteErr) {
+                console.error("❌ Failed to delete upload folder:", deleteErr);
+            }
+        }
+
+        next(error);
+    }
+});
+
+
+
+exports.logout = catchAsync(async (req, res, next) => {
+    res.cookie("jwt", "logout", {
+        httpOnly: true,
+        expires: new Date(Date.now() + 10 * 1000)
+    })
+    res.status(200).json({ status: 'success', message: 'Logged out successfully' })
+})
 
 
 exports.protect = catchAsync(async (req, res, next) => {

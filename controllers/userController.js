@@ -1,3 +1,4 @@
+const errorCodes = require("../constants/errorCodes");
 const User = require("../models/userModel");
 const APIFeatures = require("../utils/APIfeatures");
 const AppError = require("../utils/appError");
@@ -16,11 +17,10 @@ exports.createUser = catchAsync(async (req, res) => {
     res.status(201).json({ status: "success", data: { user: user } })
 })
 exports.getUserById = catchAsync(async (req, res, next) => {
-
     const user = await User.findById(req.params.id)
 
     if (!user) {
-        return next(new AppError("User not found", 404))
+        return next(new AppError("User not found", 404, errorCodes.NOT_FOUND_USER))
     }
     res.status(200).json({ status: "Success", data: { user } })
 })
@@ -38,7 +38,7 @@ exports.updateUser = catchAsync(async (req, res) => {
         runValidators: true
     })
     if (!updated) {
-        return next(new AppError("User not found", 404))
+        return next(new AppError("User not found", 404, errorCodes.NOT_FOUND_USER))
     }
     res.status(200).json({ status: "success", data: { updated } })
 

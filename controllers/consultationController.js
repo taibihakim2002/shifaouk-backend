@@ -6,14 +6,17 @@ const catchAsync = require("../utils/catchAsync");
 
 exports.getAllConsultations = catchAsync(async (req, res, next) => {
     const features = new APIFeatures(Consultation.find(), req.query).filter().sort().limitFields().paginate();
-    const consultations = await features.query
+    const consultations = await features.query.populate('doctorId', 'fullName').populate('patientId', 'fullName');
     res.status(200).json({ status: "success", results: consultations.length, data: consultations })
 })
 
 exports.createConsultations = catchAsync(async (req, res, next) => {
+    const newConsultation = { ...req.body }
 
-    const createdConsultation = await Consultation.create(req.body, { new: true });
+    const createdConsultation = await Consultation.create(newConsultation);
+
     if (!createdConsultation) {
         return new AppError("Error When Creaet")
     }
+    res.status(201).json({ status: "success", message: "created Successfuly", data: createdConsultation })
 })
