@@ -19,13 +19,13 @@ mongoose.connect(db).then(con => {
 const importData = async () => {
     try {
         switch (process.argv[3]) {
-            case 'users':
+            case 'doctors':
                 dataLocal.map(async (userData) => {
                     const user = new User(userData);
                     return await user.save();  // هذا ينفذ validation ويحفظ المستند
                 })
                 break;
-            case 'consultations':
+            case 'patients':
                 await Consultation.insertMany(dataLocal);
                 break;
 
@@ -43,11 +43,11 @@ const importData = async () => {
 const deleteData = async () => {
     try {
         switch (process.argv[3]) {
-            case 'users':
-                await User.deleteMany()
+            case 'doctors':
+                await User.deleteMany({ role: "doctor" })
                 break;
-            case 'consultations':
-                await Consultation.deleteMany()
+            case 'patients':
+                await Consultation.deleteMany({ role: "patient" })
                 break;
 
             default:

@@ -15,6 +15,9 @@ app.use(cors({
     origin: 'http://localhost:5173',
     credentials: true,
 }));
+app.use(express.static("./uploads"))
+
+
 app.use(authController.onlyFrontend)
 
 app.use(cookieParser());
@@ -24,7 +27,7 @@ if (process.env.NODE_ENV === 'development') {
 
 
 
-// app.use(express.static("./public"))
+
 app.use(express.json());
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/consultations", consultationRouter)

@@ -13,7 +13,7 @@ class APIFeatures {
 
         // Advanced filtering
         let queryStringified = JSON.stringify(myQuery);
-        queryStringified = queryStringified.replace(/\b(lte|lt|gte|gt)\b/g, (match) => `$${match}`);
+        queryStringified = queryStringified.replace(/\b(lte|lt|gte|gt|ne)\b/g, (match) => `$${match}`);
         const filtredQuery = JSON.parse(queryStringified);
         this.query = this.query.find(filtredQuery)
         return this;
@@ -36,7 +36,7 @@ class APIFeatures {
     }
     paginate() {
 
-        const limit = this.queryObj.limit * 1 || 100;
+        const limit = this.queryObj.limit * 1 || 10;
         const page = this.queryObj.page * 1 || 1;
         const skip = limit * (page - 1);
         this.query = this.query.skip(skip).limit(limit);

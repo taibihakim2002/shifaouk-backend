@@ -3,30 +3,28 @@ const User = require("../models/userModel");
 const catchAsync = require("../utils/catchAsync");
 
 exports.getOverviewStats = catchAsync(async (req, res, next) => {
-    // عدد الأطباء المقبولين
-    const totalDoctors = await User.countDocuments({
+    const approvedDoctors = await User.countDocuments({
         role: "doctor",
-        "doctorProfile.approved": true,
+        "doctorProfile.status": "approved",
     });
-
-    // عدد المرضى
+    const pendingDoctors = await User.countDocuments({
+        role: "doctor",
+        "doctorProfile.status": "pending",
+    });
     const totalPatients = await User.countDocuments({
         role: "patient",
     });
-
-    // عدد الاستشارات التي تمت
     const CompletedConsultations = await Consultation.countDocuments({
         status: "completed",
     });
-
-    // عدد الاستشارات المجدولة
     const ConfirmedConsultations = await Consultation.countDocuments({
         status: "confirmed",
     });
 
     res.status(200).json({
         status: "success", data: {
-            totalDoctors,
+            approvedDoctors,
+            pendingDoctors,
             totalPatients,
             CompletedConsultations,
             ConfirmedConsultations,

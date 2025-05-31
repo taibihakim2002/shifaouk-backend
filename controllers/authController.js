@@ -44,7 +44,7 @@ exports.login = catchAsync(async (req, res, next) => {
     if (!user || !(await user.correctPassword(password, user.password))) {
         return next(new AppError('Incorrect email or password', 401, errorCodes.AUTH_INVALID_CREDENTIALS));
     }
-    if (user.role === "doctor" && !user.doctorProfile.approved) {
+    if (user.role === "doctor" && !user.doctorProfile.status === "approved") {
         return next(new AppError("your account is not approved", 401, errorCodes.BUSINESS_DOCTOR_ACCOUNT_NOT_APPROVED))
     }
     createSendToken(user, 200, res);
@@ -78,8 +78,16 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
     const files = req.files;
 
     const getPath = (key) => {
-        if (!files[key]) return "";
-        return files[key][0].path.replace(/\\/g, "/");  // استبدال \ بـ /
+        if (!files || !files[key] || files[key].length === 0 || !files[key][0] || typeof files[key][0].path !== 'string') {
+            return new AppError("The Images Are Important");
+        }
+        let path = files[key][0].path.replace(/\\/g, "/");
+
+        const prefixToRemove = "uploads/";
+        if (path.startsWith(prefixToRemove)) {
+            path = path.substring(prefixToRemove.length);
+        }
+        return path;
     };
 
     try {
@@ -167,7 +175,7 @@ exports.protect = catchAsync(async (req, res, next) => {
         const expTimestamp = decoded.exp * 1000;
         const expiryDate = new Date(expTimestamp);
 
-        console.log(expiryDate.toString());
+
         if (!currentUser) {
             return next(new AppError('The user does not exist', 401));
         }
@@ -199,3 +207,16 @@ exports.restrictTo = (...roles) => {
         next();
     };
 };
+
+
+
+
+
+// 
+exports.registerAdmin = catchAsync(async (req, res, next) => {
+
+    const admin = { ...req.body };
+    admin.role = "admin";
+    const registredAdmin = await User.create(admin)
+    res.status(200).json({ status: "success", data: registredAdmin })
+})

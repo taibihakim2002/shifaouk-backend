@@ -1,11 +1,8 @@
 const express = require("express");
-const { login, registerPatient, registerDoctor, logout, onlyFrontend } = require("../controllers/authController");
+const { login, registerPatient, registerDoctor, logout, onlyFrontend, registerAdmin, protect } = require("../controllers/authController");
 const uploadDoctorFiles = require("../config/multer/doctorUpload");
 
 const router = express.Router();
-
-
-
 
 
 
@@ -23,6 +20,12 @@ router.post(
     ]),
     registerDoctor
 );
+
+router.post("/register/admin", onlyFrontend, registerAdmin)
+
+router.use(protect)
+
+
 router.post("/logout", onlyFrontend, logout)
 
 

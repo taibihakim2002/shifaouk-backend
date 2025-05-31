@@ -23,13 +23,19 @@ const consultationSchema = new mongoose.Schema({
         default: "online"
     },
     duration: {
-        type: String,
-        enum: ["15min", "30min"],
-        default: "15min"
+        type: Number, // مثلًا: 15 أو 30
+        enum: [15, 30],
+        default: 15
     },
     date: {
         type: Date,
-        required: [true, "The Date is required"]
+        required: true,
+        validate: {
+            validator: function (value) {
+                return value > new Date();
+            },
+            message: "Date must be in the future."
+        }
     },
     status: {
         type: String,

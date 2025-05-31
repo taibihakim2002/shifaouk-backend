@@ -5,15 +5,15 @@ const AppError = require("../utils/appError");
 const Counter = require("./counterModel");
 const availabilitySchema = new mongoose.Schema({
     day: { type: String, enum: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], required: true },
-    from: { type: String, required: true }, // "09:00"
-    to: { type: String, required: true }    // "13:00"
+    from: { type: String, required: true, match: /^([0-1]\d|2[0-3]):([0-5]\d)$/ },
+    to: { type: String, required: true, match: /^([0-1]\d|2[0-3]):([0-5]\d)$/ },
 }, { _id: false });
 
 const doctorProfileSchema = new mongoose.Schema({
     requestId: {
         type: Number,
         unique: true,
-        sparse: true // لأنه خاص بالأطباء فقط
+        sparse: true
     },
     specialization: { type: String, required: true },
     licenseDocuments: { type: [String], default: [] },
@@ -23,7 +23,22 @@ const doctorProfileSchema = new mongoose.Schema({
     rating: { type: Number, default: 0, min: 0, max: 5 },
     totalReviews: { type: Number, default: 0 },
     availability: { type: [availabilitySchema], default: [] },
-    approved: { type: Boolean, default: false },
+    slotDurationInMinutes: {
+        type: Number,
+        min: 15,
+        default: 30
+    },
+    bookingInstructions: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected', 'suspended'],
+        default: 'pending',
+    },
+    rejectionReason: { type: String, trim: true, default: '' },
     clinicAddress: String,
     workplace: String,
     doctorBio: String,
