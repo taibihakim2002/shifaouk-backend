@@ -40,11 +40,10 @@ exports.login = catchAsync(async (req, res, next) => {
         return next(new AppError('Please provide email and password', 400));
     }
     const user = await User.findOne({ email }).select('+password');
-
     if (!user || !(await user.correctPassword(password, user.password))) {
         return next(new AppError('Incorrect email or password', 401, errorCodes.AUTH_INVALID_CREDENTIALS));
     }
-    if (user.role === "doctor" && !user.doctorProfile.status === "approved") {
+    if (user.role === "doctor" && user.doctorProfile.status !== "approved") {
         return next(new AppError("your account is not approved", 401, errorCodes.BUSINESS_DOCTOR_ACCOUNT_NOT_APPROVED))
     }
     createSendToken(user, 200, res);
