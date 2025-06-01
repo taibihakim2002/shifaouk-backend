@@ -2,12 +2,12 @@ const { default: mongoose } = require("mongoose");
 const Counter = require("./counterModel");
 
 const consultationSchema = new mongoose.Schema({
-    doctorId: {
+    doctor: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: [true, "Doctor Id Is Required"]
     },
-    patientId: {
+    patient: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: [true, "Patient Id is required"]
@@ -19,12 +19,12 @@ const consultationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ["online", "in-persen"],
+        enum: ["online"],
         default: "online"
     },
     duration: {
         type: Number, // مثلًا: 15 أو 30
-        enum: [15, 30],
+        enum: [15, 30, 45, 60],
         default: 15
     },
     date: {
@@ -48,12 +48,18 @@ const consultationSchema = new mongoose.Schema({
     },
     meetingLink: {
         type: String,
-        default: null
+        default: null,
+        match: [/^https?:\/\/.+/, "Meeting link must be a valid URL"]
     },
     notes: {
         type: String,
         maxlength: 1000
     },
+    transactionRef: {
+        type: String,
+        default: null
+    },
+    files: [String],
 }, {
     timestamps: true
 })

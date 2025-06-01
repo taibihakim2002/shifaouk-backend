@@ -19,7 +19,7 @@ const doctorProfileSchema = new mongoose.Schema({
     licenseDocuments: { type: [String], default: [] },
     experienceYears: { type: Number, min: 0 },
     languages: { type: [String], default: [] },
-    consultationPrice: { type: Number, min: 0 },
+    consultationPrice: { type: Number, min: 0, default: 300 },
     rating: { type: Number, default: 0, min: 0, max: 5 },
     totalReviews: { type: Number, default: 0 },
     availability: { type: [availabilitySchema], default: [] },
@@ -45,7 +45,6 @@ const doctorProfileSchema = new mongoose.Schema({
 }, { _id: false });
 
 const patientProfileSchema = new mongoose.Schema({
-    gender: { type: String, enum: ['male', 'female'], required: false },
     birthDate: { type: Date },
     medicalHistory: { type: [String], default: [] },
     allergies: { type: [String], default: [] },
@@ -101,8 +100,14 @@ const userSchema = new mongoose.Schema({
             message: `Please enter a valid Phone Number !`
         }
     },
+    gender: {
+        type: String,
+        enum: ["ذكر", "انثى"],
+        required: [true, "gender is required!"]
+    },
     state: String,
     city: String,
+    address: String,
     password: {
         type: String,
         required: true,

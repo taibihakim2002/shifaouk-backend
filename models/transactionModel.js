@@ -2,37 +2,41 @@
 const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema({
-    userId: {
+    user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true
     },
     type: {
         type: String,
-        enum: ["recharge", "payment"],
+        enum: ["recharge", "payment", "consultation"],
         required: true
     },
     amount: {
         type: Number,
-        required: true,
-        min: 0
+        required: true
+
+    },
+    balanceAfter: {
+        type: Number,
+        required: true
+    },
+    relatedConsultation: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Consultation",
+        required: function () {
+            return this.type === "consultation";
+        }
     },
     status: {
         type: String,
         enum: ["pending", "confirmed", "failed"],
-        default: "pending"
-    },
-    consultationId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Consultation",
-        required: function () {
-            return this.type === "payment";
-        }
+        default: "confirmed"
     },
     paymentMethod: {
         type: String,
         enum: ["ccp", "visa", "wallet"],
-        default: "ccp"
+        default: "wallet"
     },
     note: String,
 }, {

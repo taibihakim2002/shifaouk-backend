@@ -6,6 +6,7 @@ const errorCodes = require("../constants/errorCodes");
 const path = require("path");
 const fs = require("fs");
 const specializations = require("../constants/specializations");
+const Wallet = require("../models/walletModel");
 
 const signToken = id => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -50,13 +51,18 @@ exports.login = catchAsync(async (req, res, next) => {
 });
 
 exports.registerPatient = catchAsync(async (req, res, next) => {
-    const newUser = { ...req.body }
+    const newUser = { ...req.body };
     newUser.role = "patient";
+
     const user = await User.create(newUser);
+
+
+    await Wallet.create({
+        user: user._id
+    });
+
     createSendToken(user, 201, res);
 });
-
-
 
 
 exports.registerDoctor = catchAsync(async (req, res, next) => {
@@ -68,6 +74,8 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
         password,
         state,
         city,
+        address,
+        gender,
         spec,
         exper,
         workplace,
@@ -78,10 +86,10 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
 
     const getPath = (key) => {
         if (!files || !files[key] || files[key].length === 0 || !files[key][0] || typeof files[key][0].path !== 'string') {
-            return new AppError("The Images Are Important");
+            throw new AppError("The Images Are Important", 400);
         }
-        let path = files[key][0].path.replace(/\\/g, "/");
 
+        let path = files[key][0].path.replace(/\\/g, "/");
         const prefixToRemove = "uploads/";
         if (path.startsWith(prefixToRemove)) {
             path = path.substring(prefixToRemove.length);
@@ -90,9 +98,8 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
     };
 
     try {
-
-
         const arabicSpec = specializations.find((s) => s.value === spec)?.label || spec;
+
         const newDoctor = await User.create({
             role: "doctor",
             fullName: {
@@ -103,10 +110,11 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
             phone,
             state,
             city,
+            address,
+            gender,
             password,
             profileImage: getPath("profile"),
             doctorProfile: {
-
                 specialization: arabicSpec,
                 experienceYears: Number(exper),
                 workplace: workplace,
@@ -119,9 +127,14 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
             }
         });
 
+
+        const wallet = await Wallet.create({
+            user: newDoctor._id
+        });
+
         res.status(201).json({
             status: "success",
-            message: "Doctor successfully registered",
+            message: "Doctor successfully registered and wallet created",
             data: newDoctor,
         });
 
@@ -140,7 +153,6 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
             try {
                 if (fs.existsSync(folderPath)) {
                     await fs.promises.rm(folderPath, { recursive: true, force: true });
-
                 }
             } catch (deleteErr) {
                 console.error("❌ Failed to delete upload folder:", deleteErr);
