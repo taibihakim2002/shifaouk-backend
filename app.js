@@ -5,6 +5,7 @@ const consultationRouter = require("./routes/consultationRoutes");
 const authRouter = require("./routes/authRoutes")
 const dashboardRouter = require("./routes/dashboardRoutes")
 const walletRouter = require("./routes/walletRoutes")
+const chargeRequestRouter = require("./routes/chargeRequestRoutes")
 const AppError = require("./utils/appError");
 const globalErrorHandler = require("./controllers/errorController");
 const authController = require("./controllers/authController");
@@ -35,6 +36,7 @@ app.use("/api/v1/consultations", consultationRouter)
 app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/dashboard", dashboardRouter)
 app.use("/api/v1/wallet", walletRouter)
+app.use("/api/v1/charge", chargeRequestRouter)
 // This is a handler for other routes (Handling Unhandled Routes)
 app.all("*", (req, res, next) => {
     next(new AppError(`This route is not handled ${req.originalUrl}`, 504))

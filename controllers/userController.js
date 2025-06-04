@@ -76,6 +76,8 @@ exports.getAllApprovedDoctors = catchAsync(async (req, res, next) => {
             { "fullName.second": searchRegex },
             { "doctorProfile.specialization": searchRegex },
             { "doctorProfile.workplace": searchRegex },
+            { "email": searchRegex },
+            { "phone": searchRegex },
         ];
         delete queryForAPIFeatures.search;
     }
@@ -383,6 +385,59 @@ function addMinutesToDate(baseDateStr, minutes) {
 
 
 
+
+exports.getAllPatients = catchAsync(async (req, res, next) => {
+    const mongoFilterConditions = {
+        role: "patient",
+        // !edit-here | يجب تعديلها عندما نظيف خاصية حضر المستخدمين
+    };
+
+    const queryForAPIFeatures = { ...req.query };
+
+    // معالجة Search
+    if (req.query.search && typeof req.query.search === 'string' && req.query.search.trim() !== '') {
+        const searchRegex = new RegExp(req.query.search.trim(), 'i'); // 'i' لتجاهل حالة الأحرف
+        mongoFilterConditions.$or = [
+            { "fullName.first": searchRegex },
+            { "fullName.second": searchRegex },
+            { "email": searchRegex },
+            { "phone": searchRegex },
+        ];
+        delete queryForAPIFeatures.search;
+    }
+
+
+    if (req.query.state) {
+        mongoFilterConditions.state = req.query.state;
+        delete queryForAPIFeatures.state;
+    }
+
+    if (req.query.gender) {
+        mongoFilterConditions.gender = req.query.gender;
+        delete queryForAPIFeatures.gender;
+    }
+
+    const features = new APIFeatures(User.find(mongoFilterConditions), queryForAPIFeatures)
+        .filter()
+        .sort()
+        .limitFields()
+        .paginate();
+
+    const users = await features.query;
+    const totalDocs = await User.countDocuments(mongoFilterConditions);
+
+    const limit = parseInt(queryForAPIFeatures.limit, 10) || parseInt(process.env.DEFAULT_PAGE_LIMIT, 10) || 9;
+    const totalPages = Math.ceil(totalDocs / limit);
+
+    res.status(200).json({
+        status: "success",
+        results: users.length,
+        totalDocs,
+        totalPages,
+        currentPage: parseInt(queryForAPIFeatures.page, 10) || 1,
+        data: { users }
+    });
+});
 
 
 

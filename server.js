@@ -12,6 +12,8 @@ process.on("uncaughtException", (err) => {
 
 
 const app = require("./app");
+const User = require("./models/userModel");
+const Wallet = require("./models/walletModel");
 
 
 
@@ -29,6 +31,7 @@ const PORT = process.env.PORT || 4000;
 
 const server = app.listen(PORT, () => {
     console.log(`I Am Listening To ${process.env.PORT}`)
+    // ensurePlatformAccount().catch(console.error);
 
 })
 
@@ -42,3 +45,40 @@ process.on("unhandledRejection", (err) => {
     })
 
 })
+
+
+
+// async function ensurePlatformAccount() {
+//     const PLATFORM_EMAIL = "platform@yourapp.com";
+
+//     // تحقق مما إذا كان الحساب موجودًا
+//     let platformUser = await User.findOne({ email: PLATFORM_EMAIL });
+
+//     if (!platformUser) {
+//         console.log("🔧 Creating platform account...");
+//         platformUser = await User.create({
+//             email: PLATFORM_EMAIL,
+//             gender: "ذكر",
+//             phone: "0500000000",
+//             password: "SecureRandomPassword123!", // اجعلها قوية ولا تسمح بالدخول بها
+//             role: "platform",
+//             fullName: { first: "Platform", second: "Account" },
+
+//         });
+//     }
+
+//     // تحقق من وجود المحفظة
+//     const existingWallet = await Wallet.findOne({ user: platformUser._id });
+//     if (!existingWallet) {
+//         console.log("💰 Creating wallet for platform...");
+//         await Wallet.create({
+//             user: platformUser._id,
+//             balance: 0
+//         });
+//     }
+
+//     console.log("✅ Platform account ready.");
+// }
+
+// // 👇 استدع هذا بعد الاتصال بقاعدة البيانات
+// ensurePlatformAccount().catch(console.error);

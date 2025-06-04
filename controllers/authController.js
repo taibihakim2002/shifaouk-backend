@@ -64,7 +64,6 @@ exports.registerPatient = catchAsync(async (req, res, next) => {
     createSendToken(user, 201, res);
 });
 
-
 exports.registerDoctor = catchAsync(async (req, res, next) => {
     const {
         name,
@@ -84,17 +83,11 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
 
     const files = req.files;
 
-    const getPath = (key) => {
-        if (!files || !files[key] || files[key].length === 0 || !files[key][0] || typeof files[key][0].path !== 'string') {
-            throw new AppError("The Images Are Important", 400);
+    const getUrl = (key) => {
+        if (!files || !files[key] || files[key].length === 0 || !files[key][0]?.path) {
+            throw new AppError("الصور ضرورية للتسجيل", 400);
         }
-
-        let path = files[key][0].path.replace(/\\/g, "/");
-        const prefixToRemove = "uploads/";
-        if (path.startsWith(prefixToRemove)) {
-            path = path.substring(prefixToRemove.length);
-        }
-        return path;
+        return files[key][0].path; // هنا نحصل على رابط Cloudinary المباشر
     };
 
     try {
@@ -113,52 +106,30 @@ exports.registerDoctor = catchAsync(async (req, res, next) => {
             address,
             gender,
             password,
-            profileImage: getPath("profile"),
+            profileImage: getUrl("profile"),
             doctorProfile: {
                 specialization: arabicSpec,
                 experienceYears: Number(exper),
                 workplace: workplace,
                 doctorBio: pio,
                 licenseDocuments: [
-                    getPath("bac"),
-                    getPath("specCar"),
-                    getPath("profession"),
+                    getUrl("bac"),
+                    getUrl("specCar"),
+                    getUrl("profession"),
                 ].filter(Boolean),
-            }
+            },
         });
 
-
         const wallet = await Wallet.create({
-            user: newDoctor._id
+            user: newDoctor._id,
         });
 
         res.status(201).json({
             status: "success",
-            message: "Doctor successfully registered and wallet created",
+            message: "تم تسجيل الطبيب بنجاح",
             data: newDoctor,
         });
-
     } catch (error) {
-        // محاولة حذف مجلد الملفات فقط إذا تم رفع ملفات
-        const anyFilePath = files ? (
-            files.profile?.[0]?.path ||
-            files.bac?.[0]?.path ||
-            files.specCar?.[0]?.path ||
-            files.profession?.[0]?.path ||
-            null
-        ) : null;
-
-        if (anyFilePath) {
-            const folderPath = path.dirname(anyFilePath);
-            try {
-                if (fs.existsSync(folderPath)) {
-                    await fs.promises.rm(folderPath, { recursive: true, force: true });
-                }
-            } catch (deleteErr) {
-                console.error("❌ Failed to delete upload folder:", deleteErr);
-            }
-        }
-
         next(error);
     }
 });

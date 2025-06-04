@@ -51,7 +51,6 @@ const patientProfileSchema = new mongoose.Schema({
     chronicDiseases: { type: [String], default: [] },
     preferredLanguages: { type: [String], default: [] },
     uploadedFiles: { type: [String], default: [] },
-    walletBalance: { type: Number, default: 0 },
     ccpNumber: { type: String }
 }, { _id: false });
 
@@ -65,7 +64,7 @@ const adminProfileSchema = new mongoose.Schema({
 const userSchema = new mongoose.Schema({
     role: {
         type: String,
-        enum: ["admin", "doctor", "patient"],
+        enum: ["admin", "doctor", "patient", "platform"],
         required: [true, "Role is required!"]
     },
     fullName: {
@@ -138,9 +137,16 @@ const userSchema = new mongoose.Schema({
         type: Date
     },
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 })
 
+
+
+userSchema.virtual('name').get(function () {
+    return `${this.fullName.first} ${this.fullName.second}`;
+});
 
 
 userSchema.pre("save", async function (next) {

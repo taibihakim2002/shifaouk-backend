@@ -1,6 +1,7 @@
 const express = require("express");
 const { login, registerPatient, registerDoctor, logout, onlyFrontend, registerAdmin, protect } = require("../controllers/authController");
-const uploadDoctorFiles = require("../config/multer/doctorUpload");
+const uploadDoctorFiles = require("../middlewares/uploadDoctorFiles");
+// const uploadDoctorFiles = require("../config/multer/doctorUpload");
 
 const router = express.Router();
 
