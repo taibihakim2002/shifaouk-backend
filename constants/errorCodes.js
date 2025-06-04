@@ -39,6 +39,12 @@ module.exports = {
     BUSINESS_PAYMENT_FAILED: 1502,
     BUSINESS_DOCTOR_ACCOUNT_NOT_APPROVED: 1503,
     BUSINESS_DOCTOR_ALREADY_REVIEWED: 1504,
+    BUSINESS_DATE_IN_PAST: 1505,                  // التاريخ في الماضي
+    BUSINESS_DOCTOR_NOT_AVAILABLE: 1506,          // الطبيب غير متاح في هذا الوقت
+    BUSINESS_SLOT_ALREADY_BOOKED: 1507,           // الموعد محجوز من طرف مريض آخر
+    BUSINESS_WALLET_NOT_FOUND: 1508,              // المحفظة غير موجودة
+    BUSINESS_WALLET_INSUFFICIENT_FUNDS: 1509,     // الرصيد غير كافٍ
+    BUSINESS_BOOKING_FAILED: 1510,
 
     // 📤 External Services (1600–1699)
     EXTERNAL_SMS_FAILED: 1600,

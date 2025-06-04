@@ -1,4 +1,5 @@
 const errorCodes = require("../constants/errorCodes");
+const Consultation = require("../models/consultationModel");
 const User = require("../models/userModel");
 const Wallet = require("../models/walletModel");
 const APIFeatures = require("../utils/APIfeatures");
@@ -297,6 +298,93 @@ exports.rejectDoctor = catchAsync(async (req, res, next) => {
         data: { doctor: updatedDoctor }
     });
 });
+
+
+
+exports.getAvailableSlots = catchAsync(async (req, res, next) => {
+    const { doctorId } = req.params;
+    const { date } = req.query;
+
+    if (!date) {
+        return next(new AppError('يرجى تحديد التاريخ المطلوب', 400));
+    }
+
+    const doctor = await User.findById(doctorId);
+    if (!doctor || doctor.role !== 'doctor') {
+        return next(new AppError('الطبيب غير موجود', 404));
+    }
+
+    const availability = doctor.doctorProfile.availability;
+    const slotDuration = doctor.doctorProfile.slotDurationInMinutes;
+    const breakMinutes = 5;
+
+    const dayOfWeek = new Date(date)
+        .toLocaleDateString('en-US', { weekday: 'short' })
+        .toLowerCase();
+
+    const dayAvailability = availability.find((a) => a.day === dayOfWeek);
+
+    if (!dayAvailability) {
+        return res.status(200).json({ slots: [] });
+    }
+
+    // إنشاء كل المواعيد الممكنة
+    const fromMinutes = parseTime(dayAvailability.from);
+    const toMinutes = parseTime(dayAvailability.to);
+
+    const allSlots = [];
+    let current = fromMinutes;
+    while (current + slotDuration <= toMinutes) {
+        const slotStart = addMinutesToDate(date, current);
+        allSlots.push(slotStart);
+        current += slotDuration + breakMinutes;
+    }
+
+    // تحديد بداية ونهاية اليوم
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // جلب الحجوزات الحالية للطبيب في هذا اليوم
+    const booked = await Consultation.find({
+        doctor: doctorId,
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: { $in: ['pending', 'confirmed'] },
+    });
+
+    const bookedTimes = booked.map((c) => c.date.toISOString().slice(11, 16)); // "HH:mm"
+
+    // إعادة جميع الأوقات مع حالتها
+    const slotsWithStatus = allSlots.map((slot) => {
+        const timeStr = slot.toISOString().slice(11, 16);
+        return {
+            time: slot.toISOString(), // يمكنك تنسيقه في الفرونت
+            isBooked: bookedTimes.includes(timeStr),
+        };
+    });
+
+    res.status(200).json({
+        status: "success",
+        slots: slotsWithStatus,
+    });
+});
+
+function parseTime(timeStr) {
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
+}
+
+function addMinutesToDate(baseDateStr, minutes) {
+    const date = new Date(baseDateStr);
+    date.setHours(0, 0, 0, 0);
+    return new Date(date.getTime() + minutes * 60000);
+}
+
+
+
+
+
 
 
 // Aggregation
