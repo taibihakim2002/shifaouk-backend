@@ -174,7 +174,7 @@ exports.protect = catchAsync(async (req, res, next) => {
 
 exports.onlyFrontend = catchAsync(async (req, res, next) => {
     const clientKey = req.get('x-api-key');
-
+    console.log(clientKey)
     if (!clientKey || clientKey !== process.env.FRONTEND_API_KEY) {
         return next(new AppError("Unauthorized access", 401))
     }
