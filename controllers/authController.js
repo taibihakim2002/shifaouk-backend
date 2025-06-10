@@ -20,12 +20,14 @@ const createSendToken = (user, statusCode, res) => {
     const cookieOptions = {
         httpOnly: true,
         // secure: process.env.NODE_ENV === 'production',
-        secure: true,
-        sameSite: 'None',
+        // secure: true,
+        secure: false,
+        // sameSite: 'None',
         maxAge: 7 * 24 * 60 * 60 * 1000
     };
 
     res.cookie('jwt', token, cookieOptions);
+
     user.password = undefined;
     res.status(statusCode).json({
         status: 'success',
@@ -174,7 +176,6 @@ exports.protect = catchAsync(async (req, res, next) => {
 
 exports.onlyFrontend = catchAsync(async (req, res, next) => {
     const clientKey = req.get('x-api-key');
-    console.log(clientKey)
     if (!clientKey || clientKey !== process.env.FRONTEND_API_KEY) {
         return next(new AppError("Unauthorized access", 401))
     }
@@ -182,6 +183,7 @@ exports.onlyFrontend = catchAsync(async (req, res, next) => {
 });
 
 exports.restrictTo = (...roles) => {
+
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
             return next(new AppError('You do not have permission', 403));

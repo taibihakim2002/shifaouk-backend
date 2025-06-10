@@ -1,5 +1,7 @@
 
 require("dotenv").config()
+require("./jobs/cleanupConsultations");
+
 const mongoose = require("mongoose");
 
 

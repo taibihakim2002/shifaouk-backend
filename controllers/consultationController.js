@@ -11,12 +11,8 @@ const errorCodes = require("../constants/errorCodes");
 
 
 exports.getAllConsultations = catchAsync(async (req, res, next) => {
-
     const queryForAPIFeatures = { ...req.query };
-
-
     const mongoFilterConditions = {};
-
     // بحث نصي
     if (req.query.search && typeof req.query.search === 'string' && req.query.search.trim() !== '') {
         const searchRegex = new RegExp(req.query.search.trim(), 'i');
@@ -49,6 +45,47 @@ exports.getAllConsultations = catchAsync(async (req, res, next) => {
     const consultations = await features.query.populate('doctor').populate('patient');
     res.status(200).json({ status: "success", results: consultations.length, data: consultations })
 })
+exports.getMyAppointments = catchAsync(async (req, res, next) => {
+
+    const queryForAPIFeatures = { ...req.query };
+    const mongoFilterConditions = {
+        patient: req.user._id, // 👈 الشرط المضاف لتصفية الاستشارات حسب المريض
+    };
+    if (req.query.search && typeof req.query.search === 'string' && req.query.search.trim() !== '') {
+        const searchRegex = new RegExp(req.query.search.trim(), 'i');
+        mongoFilterConditions.$or = [
+            { "doctor.fullName.first": searchRegex },
+            { "doctor.fullName.second": searchRegex },
+            { "patient.fullName.first": searchRegex },
+            { "patient.fullName.second": searchRegex },
+        ];
+        delete queryForAPIFeatures.search;
+    }
+
+    // فلترة حسب يوم محدد
+    if (req.query.date) {
+        const date = new Date(req.query.date); // ISO string قادم من React
+
+        const start = new Date(date.setHours(0, 0, 0, 0));
+        const end = new Date(date.setHours(23, 59, 59, 999));
+
+        mongoFilterConditions.date = { $gte: start, $lte: end };
+        delete queryForAPIFeatures.date;
+    }
+    // فلترة حسب الحالة
+    if (req.query.status) {
+        mongoFilterConditions.status = req.query.status;
+        delete queryForAPIFeatures.status;
+    }
+
+    const features = new APIFeatures(Consultation.find(mongoFilterConditions), queryForAPIFeatures).filter().sort().limitFields().paginate();
+    const consultations = await features.query.populate('doctor').populate('patient');
+    res.status(200).json({ status: "success", results: consultations.length, data: consultations })
+})
+
+
+
+
 exports.getDoctorConsultations = catchAsync(async (req, res, next) => {
     const consultations = await Consultation.find({ doctor: req.params.doctor })
     if (!consultations) {
@@ -56,6 +93,125 @@ exports.getDoctorConsultations = catchAsync(async (req, res, next) => {
     }
     res.status(200).json({ status: "success", results: consultations.length, data: consultations })
 })
+exports.getConsultationById = catchAsync(async (req, res, next) => {
+    const { id } = req.params
+    const consultation = await Consultation.findById(id).populate("patient")
+    if (!consultation) {
+        return next(new AppError("No Consultations found", 404))
+    }
+    res.status(200).json({ status: "success", data: consultation })
+})
+
+exports.approveConsultation = catchAsync(async (req, res, next) => {
+    const { consultationId } = req.params;
+    const doctorId = req.user.id; // تأكد أن middleware auth يضيف req.user
+
+    const consultation = await Consultation.findById(consultationId);
+
+    if (!consultation) {
+        return res.status(404).json({ status: "fail", message: "consultation not found  " });
+    }
+
+    // تحقق من أن الطبيب هو نفسه الذي يملك الاستشارة
+    if (consultation.doctor.toString() !== doctorId) {
+        return res.status(403).json({ status: "fail", message: "غير مصرح لك بقبول هذه الاستشارة" });
+    }
+
+    // تحقق من الحالة
+    if (consultation.status !== "pending") {
+        return res.status(400).json({ status: "fail", message: "لا يمكن تعديل هذه الاستشارة لأنها ليست قيد الانتظار" });
+    }
+
+    consultation.status = "confirmed";
+    await consultation.save();
+
+    res.status(200).json({ status: "success", message: "تم تأكيد الاستشارة", data: consultation });
+});
+exports.rejectConsultation = catchAsync(async (req, res, next) => {
+    const { consultationId } = req.params;
+    const doctorId = req.user.id;
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const consultation = await Consultation.findById(consultationId).session(session);
+        if (!consultation) {
+            await session.abortTransaction();
+            return res.status(404).json({ status: "fail", message: "الاستشارة غير موجودة" });
+        }
+
+        if (consultation.doctor.toString() !== doctorId) {
+            await session.abortTransaction();
+            return res.status(403).json({ status: "fail", message: "غير مصرح لك بإلغاء هذه الاستشارة" });
+        }
+
+        if (consultation.status !== "pending") {
+            await session.abortTransaction();
+            return res.status(400).json({ status: "fail", message: "لا يمكن إلغاء هذه الاستشارة" });
+        }
+
+        // تحديث حالة الاستشارة
+        consultation.status = "cancelled";
+        await consultation.save({ session });
+
+        // إرجاع المبلغ للمريض وخصمه من المنصة
+        const patientWallet = await Wallet.findOne({ user: consultation.patient }).session(session);
+        const PLATFORM_EMAIL = "platform@yourapp.com";
+        const platformUser = await User.findOne({ email: PLATFORM_EMAIL }).session(session);
+        const platformWallet = await Wallet.findOne({ user: platformUser._id }).session(session);
+
+        if (!patientWallet || !platformWallet) {
+            await session.abortTransaction();
+            return res.status(500).json({ status: "fail", message: "حدث خطأ أثناء استرجاع الأموال" });
+        }
+
+        // تحويل المبلغ من المنصة للمريض
+        const refundAmount = consultation.price;
+        patientWallet.balance += refundAmount;
+        platformWallet.balance -= refundAmount;
+
+        await patientWallet.save({ session });
+        await platformWallet.save({ session });
+
+        // تسجيل المعاملة للمريض
+        await Transaction.create([{
+            user: consultation.patient,
+            type: "refund",
+            amount: refundAmount,
+            balanceAfter: patientWallet.balance,
+            relatedConsultation: consultation._id,
+            note: "استرجاع مبلغ استشارة ملغاة"
+        }], { session });
+
+        // تسجيل المعاملة للمنصة
+        await Transaction.create([{
+            user: platformUser._id,
+            type: "consultation_refund",
+            amount: -refundAmount,
+            balanceAfter: platformWallet.balance,
+            relatedConsultation: consultation._id,
+            note: "خصم مبلغ استشارة ملغاة"
+        }], { session });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        res.status(200).json({
+            status: "success",
+            message: "تم إلغاء الاستشارة واسترجاع المبلغ",
+            data: consultation
+        });
+
+    } catch (err) {
+        await session.abortTransaction();
+        session.endSession();
+        console.error(err);
+        return next(new AppError("فشل في إلغاء الاستشارة", 500));
+    }
+});
+
+
 
 
 
@@ -97,7 +253,7 @@ exports.createConsultations = catchAsync(async (req, res, next) => {
         const buffer = 5 * 60 * 1000;
 
         const overlapping = await Consultation.findOne({
-            doctorId: doctorAccount._id,
+            doctor: doctorAccount._id,
             date: {
                 $gte: new Date(consultationDate.getTime() - durationMinutes * 60000 - buffer),
                 $lt: new Date(consultationEnd.getTime() + buffer)
@@ -118,6 +274,12 @@ exports.createConsultations = catchAsync(async (req, res, next) => {
         if (patientWallet.balance < consultationPrice)
             return next(new AppError("Insufficient balance", 400, errorCodes.BUSINESS_WALLET_INSUFFICIENT_FUNDS));
 
+        const medicalFiles = req.files?.map(file => ({
+            url: file.path,
+            public_id: file.filename,
+            format: file.format,
+        }));
+
         // 🏦 خصم من المريض
         patientWallet.balance -= consultationPrice;
         await patientWallet.save({ session });
@@ -132,29 +294,36 @@ exports.createConsultations = catchAsync(async (req, res, next) => {
         const platformUser = await User.findOne({ email: PLATFORM_EMAIL }).session(session);
         const platformWallet = await Wallet.findOne({ user: platformUser._id }).session(session);
 
-        platformWallet.balance += platformShare;
+        // 💰 كل المبلغ يذهب للمنصة
+        platformWallet.balance += consultationPrice;
         await platformWallet.save({ session });
 
-        // 🧾 اضافة رصيد للطبيب
-        let doctorWallet = await Wallet.findOne({ user: doctorAccount._id }).session(session);
-        if (!doctorWallet) {
-            doctorWallet = await Wallet.create([{ user: doctorAccount._id, balance: 0 }], { session });
-            doctorWallet = doctorWallet[0];
-        }
 
-        doctorWallet.balance += doctorShare;
-        await doctorWallet.save({ session });
 
-        // 📝 إنشاء الاستشارة
+
+        // 📝 إنشاء الاستشارة مع doctorShare
         const consultation = await Consultation.create([{
             doctor: doctorAccount._id,
             patient: patientAccount._id,
             date: consultationDate,
             duration: durationMinutes,
             price: consultationPrice,
+            doctorShare,
             type,
-            notes
+            notes,
+            status: "pending",
+            medicalFiles
         }], { session });
+
+        await Transaction.create([{
+            user: platformUser._id,
+            type: "consultation_income",
+            amount: consultationPrice,
+            balanceAfter: platformWallet.balance,
+            relatedConsultation: consultation[0]._id,
+            note: `تحصيل مبلغ استشارة من المريض ${patientAccount.fullName?.first || "غير معروف"}`
+        }], { session });
+
 
         // 💸 تسجيل المعاملة للمريض
         await Transaction.create([{
@@ -193,3 +362,22 @@ exports.createConsultations = catchAsync(async (req, res, next) => {
         return next(err instanceof AppError ? err : new AppError("Failed to create consultation", 500, errorCodes.BUSINESS_BOOKING_FAILED));
     }
 });
+
+
+
+exports.getNextAppointment = catchAsync(async (req, res, next) => {
+    const userId = req.user._id;
+
+    const nextAppointment = await Consultation.findOne({
+        patient: userId,
+        date: { $gt: new Date() }, // التاريخ المستقبلي فقط
+        status: { $in: "confirmed" }, // تجاهل الملغاة
+    })
+        .sort({ date: 1 }) // أقرب موعد أولًا
+        .populate("doctor");
+
+    res.status(200).json({
+        status: "success",
+        data: nextAppointment,
+    });
+})

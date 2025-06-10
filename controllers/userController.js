@@ -206,7 +206,7 @@ exports.updateDoctor = catchAsync(async (req, res) => {
     if (!updated) {
         return next(new AppError("Doctor not found", 404, errorCodes.NOT_FOUND_DOCTOR))
     }
-    res.status(200).json({ status: "success", data: { updated } })
+    res.status(200).json({ status: "success", data: updated })
 
 })
 
@@ -391,7 +391,6 @@ exports.getAllPatients = catchAsync(async (req, res, next) => {
         role: "patient",
         // !edit-here | يجب تعديلها عندما نظيف خاصية حضر المستخدمين
     };
-
     const queryForAPIFeatures = { ...req.query };
 
     // معالجة Search
@@ -432,13 +431,225 @@ exports.getAllPatients = catchAsync(async (req, res, next) => {
     res.status(200).json({
         status: "success",
         results: users.length,
-        totalDocs,
-        totalPages,
-        currentPage: parseInt(queryForAPIFeatures.page, 10) || 1,
-        data: { users }
+        data: users
+    });
+});
+exports.getPatientById = catchAsync(async (req, res, next) => {
+
+    const { id } = req.params
+
+    const user = await User.findById(id).populate('wallet');
+    if (!user) {
+        return next(new AppError("user not found"))
+    }
+    res.status(200).json({
+        status: "success",
+        data: user
+    });
+});
+exports.adminUpdatePatient = catchAsync(async (req, res, next) => {
+
+
+    const updateData = {
+        'fullName.first': req.body?.fullName?.first,
+        'fullName.second': req.body?.fullName?.second,
+        'email': req.body?.email,
+        'phone': req.body?.phone,
+        'state': req.body?.state,
+        "gender": req.body?.gender,
+        'city': req.body?.city,
+        "address": req.body?.address,
+        'profileImage': req.body?.profileImage,
+    };
+
+
+    const updated = await User.findOneAndUpdate(
+        { _id: req.params.id, role: "patient" },
+        updateData,
+        {
+            new: true,
+            runValidators: true,
+        }
+    );
+    if (!updated) {
+        return next(new AppError("User not found", 404, errorCodes.NOT_FOUND_USER))
+    }
+    res.status(200).json({ status: "success", data: updated })
+});
+
+exports.updatePatient = catchAsync(async (req, res, next) => {
+    const body = req.body;
+    await User.updateOne(
+        { _id: req.user._id, role: "patient", patientProfile: null },
+        { $set: { patientProfile: {} } }
+    );
+    const parseMultiline = (str) =>
+        str?.split("\n").map((line) => line.trim()).filter(Boolean) || [];
+
+    const updateData = {
+        "fullName.first": body.firstName,
+        "fullName.second": body.lastName,
+        email: body.email,
+        phone: body.phone,
+        gender: body.gender,
+        state: body.state,
+        city: body.city,
+        address: body.address,
+        birthDate: body.birthDate,
+        "patientProfile.bloodType": body.bloodType,
+        "patientProfile.medicalHistory": parseMultiline(body.medicalHistory),
+        "patientProfile.surgeries": parseMultiline(body.surgeries),
+        "patientProfile.familyHistory": parseMultiline(body.familyHistory),
+        "patientProfile.allergies": parseMultiline(body.allergies),
+        "patientProfile.chronicDiseases": parseMultiline(body.chronicDiseases),
+        "patientProfile.currentMedications": parseMultiline(body.currentMedications),
+    };
+
+    // Handle profile image
+    if (req.files?.profileImage?.[0]?.path) {
+        updateData.profileImage = req.files.profileImage[0].path;
+    }
+
+    // Handle new uploaded medical files
+    if (req.files?.files) {
+        const { files } = req.files;
+
+        const fileNames = req.body.fileNames || [];
+        const fileDates = req.body.fileDates || [];
+
+        const formattedFiles = files.map((file, index) => ({
+            url: file.path,
+            name: Array.isArray(fileNames) ? fileNames[index] : fileNames,
+            date: new Date(
+                Array.isArray(fileDates) ? fileDates[index] : fileDates
+            ),
+        }));
+
+        // 🟡 دمج الملفات الجديدة مع الملفات القديمة
+        const userDoc = await User.findById(req.user._id).lean();
+        const existingFiles = userDoc?.patientProfile?.uploadedFiles || [];
+
+        updateData["patientProfile.uploadedFiles"] = [...existingFiles, ...formattedFiles];
+    }
+
+    const user = await User.findById(req.user._id)
+
+    const updated = await User.findOneAndUpdate(
+        { _id: req.user._id, role: "patient" },
+        { $set: updateData },
+        { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+        return next(
+            new AppError("User not found", 404)
+        );
+    }
+
+    res.status(200).json({ status: "success", data: updated });
+});
+
+exports.getDoctorPatients = catchAsync(async (req, res, next) => {
+    const doctorId = req.user._id;
+
+    const patients = await Consultation.aggregate([
+        {
+            $match: {
+                doctor: doctorId,
+
+            }
+        },
+        {
+            $group: {
+                _id: "$patient" // اجمع حسب المريض
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "_id",
+                foreignField: "_id",
+                as: "patientInfo"
+            }
+        },
+        {
+            $unwind: "$patientInfo"
+        },
+        {
+            $project: {
+                _id: "$patientInfo._id",
+                fullName: "$patientInfo.fullName",
+                email: "$patientInfo.email",
+                phone: "$patientInfo.phone",
+                gender: "$patientInfo.gender",
+                phone: "$patientInfo.phone",
+                state: "$patientInfo.state",
+                city: "$patientInfo.city",
+                profileImage: "$patientInfo.profileImage",
+                createdAt: "$patientInfo.createdAt",
+                // أضف حقول أخرى حسب الحاجة
+            }
+        }
+    ]);
+
+    res.status(200).json({
+        status: "success",
+        results: patients.length,
+        data: patients
     });
 });
 
+exports.toggleFavoriteDoctor = catchAsync(async (req, res, next) => {
+    const user = await User.findById(req.user._id);
+
+    if (!user || user.role !== "patient") {
+        return next(new AppError("غير مصرح لك بتنفيذ هذا الإجراء", 403));
+    }
+
+    const doctorId = req.params.doctorId;
+
+    // تحقق من وجود طبيب بهذا المعرف
+    const doctor = await User.findOne({ _id: doctorId, role: "doctor" });
+    if (!doctor) {
+        return next(new AppError("الطبيب غير موجود", 404));
+    }
+
+    const favorites = user.patientProfile.favoriteDoctors.map(id => id.toString());
+    const index = favorites.indexOf(doctorId);
+
+    let action;
+
+    if (index > -1) {
+        // الطبيب موجود → نقوم بالإزالة
+        user.patientProfile.favoriteDoctors.splice(index, 1);
+        action = "removed";
+    } else {
+        // الطبيب غير موجود → نقوم بالإضافة
+        user.patientProfile.favoriteDoctors.push(doctorId);
+        action = "added";
+    }
+
+    await user.save();
+
+    res.status(200).json({
+        status: "success",
+        action, // 'added' or 'removed'
+        message: action === "added" ? "تمت إضافة الطبيب إلى المفضلة" : "تمت إزالة الطبيب من المفضلة"
+    });
+});
+
+exports.getFavoriteDoctors = catchAsync(async (req, res, next) => {
+    const user = await User.findById(req.user._id).populate("patientProfile.favoriteDoctors");
+
+    if (!user || !user.patientProfile) {
+        return next(new AppError("المستخدم غير موجود أو ليس مريضًا", 404));
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: user.patientProfile.favoriteDoctors,
+    });
+});
 
 
 

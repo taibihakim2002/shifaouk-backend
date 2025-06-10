@@ -39,8 +39,12 @@ const consultationSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["pending", "confirmed", "cancelled", "completed"],
+        enum: ["pending", "confirmed", "cancelled", "completed", "expired"],
         default: "pending",
+    },
+    doctorShare: {
+        type: Number,
+        required: true
     },
     price: {
         type: Number,
@@ -59,7 +63,14 @@ const consultationSchema = new mongoose.Schema({
         type: String,
         default: null
     },
-    files: [String],
+    medicalFiles: [
+        {
+            url: String,
+            public_id: String,
+            format: String
+        }
+    ],
+
 }, {
     timestamps: true
 })

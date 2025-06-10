@@ -47,10 +47,10 @@ exports.getAdminWalletStats = catchAsync(async (req, res, next) => {
     const pendingRequests = await ChargeRequest.countDocuments({
         status: "pending",
     });
-    const approvedRequests = await User.countDocuments({
+    const approvedRequests = await ChargeRequest.countDocuments({
         status: "approved",
     });
-    const rejectedRequests = await Consultation.countDocuments({
+    const rejectedRequests = await ChargeRequest.countDocuments({
         status: "rejected",
     });
     res.status(200).json({
@@ -63,3 +63,67 @@ exports.getAdminWalletStats = catchAsync(async (req, res, next) => {
     })
 
 })
+
+exports.getDoctorHomeStats = catchAsync(async (req, res, next) => {
+
+    const doctorId = req.user.id;
+
+    const uniquePatientIds = await Consultation.distinct("patient", { doctor: doctorId, status: 'completed' });
+    const totalUniquePatients = uniquePatientIds.length;
+    const pendingConsultationsCount = await Consultation.countDocuments({
+        doctor: doctorId,
+        status: 'pending'
+    });
+
+    const ConfirmedConsultationsCount = await Consultation.countDocuments({
+        doctor: doctorId,
+        status: { $in: ['confirmed'] }
+    });
+
+
+
+    const wallet = await Wallet.findOne({ user: doctorId });
+    if (wallet) {
+        walletBalance = wallet.balance;
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: {
+            totalPatients: totalUniquePatients, // عدد المرضى الفريدين
+            pendingRequests: pendingConsultationsCount, // طلبات الاستشارة المعلقة
+            confirmedConsultationsCount: ConfirmedConsultationsCount, // الطلبات المقبولة/المكتملة
+            walletBalance: walletBalance,
+        }
+    });
+});
+
+exports.getPatientHomeStats = catchAsync(async (req, res, next) => {
+
+    const patientId = req.user.id;
+
+
+    const completedConsultationsCount = await Consultation.countDocuments({
+        patient: patientId,
+        status: { $in: ['completed'] }
+    });
+
+    const user = await User.findById(patientId).select('patientProfile.favoriteDoctors');
+
+    const favoriteDoctorsCount = user?.patientProfile?.favoriteDoctors?.length || 0;
+
+    const wallet = await Wallet.findOne({ user: patientId });
+    if (wallet) {
+        walletBalance = wallet.balance;
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: {
+            completedConsultations: completedConsultationsCount,
+            totalfavoriteDoctors: favoriteDoctorsCount,
+            walletBalance: walletBalance,
+        }
+    });
+});
+

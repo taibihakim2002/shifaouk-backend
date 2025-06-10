@@ -45,13 +45,29 @@ const doctorProfileSchema = new mongoose.Schema({
 }, { _id: false });
 
 const patientProfileSchema = new mongoose.Schema({
-    birthDate: { type: Date },
+
     medicalHistory: { type: [String], default: [] },
     allergies: { type: [String], default: [] },
     chronicDiseases: { type: [String], default: [] },
+    currentMedications: { type: [String], default: [] }, // ✅ الأدوية الحالية
+
+    bloodType: {
+        type: String,
+        enum: ["", 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+        default: null
+    }, // ✅ الزمرة الدموية
+
+    surgeries: { type: [String], default: [] }, // ✅ عمليات سابقة
+    familyHistory: { type: [String], default: [] }, // ✅ أمراض وراثية في العائلة
     preferredLanguages: { type: [String], default: [] },
-    uploadedFiles: { type: [String], default: [] },
-    ccpNumber: { type: String }
+    uploadedFiles: [
+        {
+            url: String,
+            name: String,
+            date: Date,
+        }
+    ],
+    favoriteDoctors: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 }, { _id: false });
 
 const adminProfileSchema = new mongoose.Schema({
@@ -81,6 +97,7 @@ const userSchema = new mongoose.Schema({
             required: true
         },
     },
+    birthDate: { type: Date },
     email: {
         type: String,
         required: [true, "Email  is required!"],
@@ -146,6 +163,13 @@ const userSchema = new mongoose.Schema({
 
 userSchema.virtual('name').get(function () {
     return `${this.fullName.first} ${this.fullName.second}`;
+});
+
+userSchema.virtual('wallet', {
+    ref: 'Wallet',
+    localField: '_id',
+    foreignField: 'user',
+    justOne: true // لأن المحفظة واحدة لكل مستخدم
 });
 
 
