@@ -5,6 +5,6 @@ const { getMyTransactions } = require('../controllers/transactionController');
 const router = express.Router();
 
 router.use(protect)
-router.route("/my-transactions").get(restrictTo("patient", "admin"), getMyTransactions)
+router.route("/my-transactions").get(restrictTo("patient", "doctor", "admin"), getMyTransactions)
 
 module.exports = router;

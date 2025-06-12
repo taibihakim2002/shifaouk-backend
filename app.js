@@ -16,8 +16,8 @@ const cors = require('cors');
 const app = express()
 
 app.use(cors({
-    origin: "http://localhost:5173",
-    // origin: "https://shifaouk.netlify.app/" ,
+    // origin: "http://localhost:5173",
+    origin: "https://shifaouk.netlify.app/",
     credentials: true,
 }));
 app.use(express.static("./uploads"))

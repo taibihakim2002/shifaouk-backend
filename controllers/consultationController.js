@@ -48,9 +48,17 @@ exports.getAllConsultations = catchAsync(async (req, res, next) => {
 exports.getMyAppointments = catchAsync(async (req, res, next) => {
 
     const queryForAPIFeatures = { ...req.query };
-    const mongoFilterConditions = {
-        patient: req.user._id, // 👈 الشرط المضاف لتصفية الاستشارات حسب المريض
-    };
+    let mongoFilterConditions
+    if (req.user.role === "patient") {
+        mongoFilterConditions = {
+            patient: req.user._id, // 👈 الشرط المضاف لتصفية الاستشارات حسب المريض
+        };
+    } else if (req.user.role === "doctor") {
+        mongoFilterConditions = {
+            doctor: req.user._id, // 👈 الشرط المضاف لتصفية الاستشارات حسب المريض
+        };
+    }
+
     if (req.query.search && typeof req.query.search === 'string' && req.query.search.trim() !== '') {
         const searchRegex = new RegExp(req.query.search.trim(), 'i');
         mongoFilterConditions.$or = [

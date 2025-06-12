@@ -2,6 +2,7 @@ const express = require("express")
 const userController = require("../controllers/userController");
 const { restrictTo, protect } = require("../controllers/authController");
 const uploadPatientFiles = require("../middlewares/uploadPatientFiles");
+const uploadDoctorFiles = require("../middlewares/updateDoctorFiles");
 const router = express.Router();
 
 
@@ -26,6 +27,13 @@ router.route("/patients").get(userController.getAllPatients).patch(
     ]),
     userController.updatePatient
 );
+router.patch(
+    "/doctors/profile",
+    restrictTo("doctor"),
+    uploadDoctorFiles.single("profileImage"),
+    userController.updateDoctorProfile
+);
+
 router.route("/patients/:id").get(userController.getPatientById)
 router.route("/patients/edit/:id").patch(restrictTo("admin"), userController.adminUpdatePatient)
 

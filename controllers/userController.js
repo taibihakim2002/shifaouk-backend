@@ -486,6 +486,9 @@ exports.updatePatient = catchAsync(async (req, res, next) => {
     const parseMultiline = (str) =>
         str?.split("\n").map((line) => line.trim()).filter(Boolean) || [];
 
+
+
+
     const updateData = {
         "fullName.first": body.firstName,
         "fullName.second": body.lastName,
@@ -548,6 +551,62 @@ exports.updatePatient = catchAsync(async (req, res, next) => {
 
     res.status(200).json({ status: "success", data: updated });
 });
+
+
+
+exports.updateDoctorProfile = catchAsync(async (req, res, next) => {
+    const body = req.body;
+
+
+
+    // في حال لم يتم إعداد ملف doctorProfile سابقًا
+    await User.updateOne(
+        { _id: req.user._id, role: "doctor", doctorProfile: null },
+        { $set: { doctorProfile: {} } }
+    );
+
+
+
+
+    const updateData = {
+        "fullName.first": body.firstName,
+        "fullName.second": body.lastName,
+        gender: body.gender,
+        phone: body.phone,
+        state: body.state,
+        city: body.city,
+        address: body.address,
+        birthDate: body.birthDate,
+
+        // Doctor profile updates
+        "doctorProfile.specialization": body.doctorProfile.specialization,
+        "doctorProfile.experienceYears": Number(body.doctorProfile.experienceYears),
+        "doctorProfile.clinicAddress": body.doctorProfile.clinicAddress,
+        "doctorProfile.workplace": body.doctorProfile.workplace,
+        "doctorProfile.consultationPrice": Number(body.doctorProfile.consultationPrice),
+        "doctorProfile.slotDurationInMinutes": Number(body.doctorProfile.slotDurationInMinutes),
+        "doctorProfile.doctorBio": body.doctorProfile.doctorBio,
+        "doctorProfile.bookingInstructions": body.doctorProfile.bookingInstructions || "",
+    };
+
+
+    if (req.file?.path) {
+        updateData.profileImage = req.file.path;
+    }
+
+    const updated = await User.findOneAndUpdate(
+        { _id: req.user._id, role: "doctor" },
+        { $set: updateData },
+        { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+        return next(new AppError("لم يتم العثور على الطبيب", 404));
+    }
+
+    res.status(200).json({ status: "success", data: updated });
+});
+
 
 exports.getDoctorPatients = catchAsync(async (req, res, next) => {
     const doctorId = req.user._id;
