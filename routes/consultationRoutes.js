@@ -1,5 +1,5 @@
 const express = require("express")
-const { getAllConsultations, createConsultations, getDoctorConsultations, getNextAppointment, getConsultationById, approveConsultation, rejectConsultation, getMyAppointments } = require("../controllers/consultationController")
+const { getAllConsultations, createConsultations, getDoctorConsultations, getConsultationById, approveConsultation, rejectConsultation, getMyAppointments, getPatientNextAppointment, getDoctorNextAppointment } = require("../controllers/consultationController")
 const { onlyFrontend, restrictTo, protect } = require("../controllers/authController")
 const uploadAppointmentFiles = require("../middlewares/uploadAppointmentFiles")
 
@@ -21,7 +21,8 @@ router
         uploadAppointmentFiles.array("medicalRecords", 5), // اسم الحقل كما في الفورم
         createConsultations
     );
-router.route("/patient/next-appointment").get(restrictTo("patient"), getNextAppointment)
+router.route("/patient/next-appointment").get(restrictTo("patient"), getPatientNextAppointment)
+router.route("/doctor/next-appointment").get(restrictTo("doctor"), getDoctorNextAppointment)
 router.route("/patient/my-appointment").get(restrictTo("patient"), getMyAppointments)
 
 module.exports = router

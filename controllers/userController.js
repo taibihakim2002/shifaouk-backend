@@ -556,12 +556,19 @@ exports.getDoctorPatients = catchAsync(async (req, res, next) => {
         {
             $match: {
                 doctor: doctorId,
-
+                status: "completed"
             }
         },
         {
+            $sort: { date: -1 } // الأحدث أولًا
+        },
+        {
             $group: {
-                _id: "$patient" // اجمع حسب المريض
+                _id: "$patient",
+                consultationsCount: { $sum: 1 },
+                lastConsultationDate: { $first: "$date" },
+                lastConsultationId: { $first: "$_id" },
+                lastConsultationStatus: { $first: "$status" } // ✅ إضافة حالة آخر استشارة
             }
         },
         {
@@ -572,22 +579,41 @@ exports.getDoctorPatients = catchAsync(async (req, res, next) => {
                 as: "patientInfo"
             }
         },
+        { $unwind: "$patientInfo" },
+
         {
-            $unwind: "$patientInfo"
+            $lookup: {
+                from: "consultationreports",
+                localField: "lastConsultationId",
+                foreignField: "consultation",
+                as: "lastReport"
+            }
         },
+        {
+            $unwind: {
+                path: "$lastReport",
+                preserveNullAndEmptyArrays: true
+            }
+        },
+
         {
             $project: {
                 _id: "$patientInfo._id",
                 fullName: "$patientInfo.fullName",
+                name: "$patientInfo.name",
                 email: "$patientInfo.email",
                 phone: "$patientInfo.phone",
                 gender: "$patientInfo.gender",
-                phone: "$patientInfo.phone",
                 state: "$patientInfo.state",
                 city: "$patientInfo.city",
+                birthDate: "$patientInfo.birthDate",
                 profileImage: "$patientInfo.profileImage",
                 createdAt: "$patientInfo.createdAt",
-                // أضف حقول أخرى حسب الحاجة
+                consultationsCount: 1,
+                lastConsultationDate: 1,
+                lastConsultationStatus: 1, // ✅ عرض حالة الاستشارة
+                lastDiagnosis: "$lastReport.diagnosis",
+                lastPatientCondition: "$lastReport.patientCondition"
             }
         }
     ]);
@@ -598,6 +624,7 @@ exports.getDoctorPatients = catchAsync(async (req, res, next) => {
         data: patients
     });
 });
+
 
 exports.toggleFavoriteDoctor = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.user._id);

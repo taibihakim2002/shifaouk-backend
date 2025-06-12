@@ -40,7 +40,7 @@ app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/dashboard", dashboardRouter)
 app.use("/api/v1/wallet", walletRouter)
 app.use("/api/v1/charge", chargeRequestRouter)
-app.use("/api/v1/consultation-report", consultationReportRouter)
+app.use("/api/v1/consultation-reports", consultationReportRouter)
 app.use("/api/v1/transaction", transactionRouter)
 // This is a handler for other routes (Handling Unhandled Routes)
 app.all("*", (req, res, next) => {

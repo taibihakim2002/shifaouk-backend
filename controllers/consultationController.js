@@ -365,19 +365,47 @@ exports.createConsultations = catchAsync(async (req, res, next) => {
 
 
 
-exports.getNextAppointment = catchAsync(async (req, res, next) => {
+exports.getPatientNextAppointment = catchAsync(async (req, res, next) => {
     const userId = req.user._id;
+    const now = new Date();
 
     const nextAppointment = await Consultation.findOne({
         patient: userId,
-        date: { $gt: new Date() }, // التاريخ المستقبلي فقط
-        status: { $in: "confirmed" }, // تجاهل الملغاة
+        status: { $in: ["confirmed"] }, // فقط المؤكدة
+        $expr: {
+            $gt: [
+                { $add: ["$date", { $multiply: [{ $add: ["$duration", 5] }, 60000] }] },
+                now
+            ]
+        }
     })
-        .sort({ date: 1 }) // أقرب موعد أولًا
+        .sort({ date: 1 })
         .populate("doctor");
 
     res.status(200).json({
         status: "success",
         data: nextAppointment,
     });
-})
+});
+exports.getDoctorNextAppointment = catchAsync(async (req, res, next) => {
+    const userId = req.user._id;
+    const now = new Date();
+
+    const nextAppointment = await Consultation.findOne({
+        doctor: userId,
+        status: { $in: ["confirmed"] },
+        $expr: {
+            $gt: [
+                { $add: ["$date", { $multiply: [{ $add: ["$duration", 5] }, 60000] }] },
+                now
+            ]
+        }
+    })
+        .sort({ date: 1 })
+        .populate("patient");
+
+    res.status(200).json({
+        status: "success",
+        data: nextAppointment,
+    });
+});
