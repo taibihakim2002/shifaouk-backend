@@ -1,6 +1,6 @@
 const express = require("express")
 const { protect } = require("../controllers/authController");
-const { getReportByConsultationId, doctorCreateAppointmentReport } = require("../controllers/consultationReportController");
+const { getReportByConsultationId, doctorCreateAppointmentReport } = require("../controllers/ConsultationReportController");
 
 
 const router = express.Router()
