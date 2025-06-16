@@ -311,6 +311,7 @@ exports.getAvailableSlots = catchAsync(async (req, res, next) => {
         return next(new AppError('يرجى تحديد التاريخ المطلوب', 400));
     }
 
+
     const doctor = await User.findById(doctorId);
     if (!doctor || doctor.role !== 'doctor') {
         return next(new AppError('الطبيب غير موجود', 404));
@@ -324,24 +325,65 @@ exports.getAvailableSlots = catchAsync(async (req, res, next) => {
         .toLocaleDateString('en-US', { weekday: 'short' })
         .toLowerCase();
 
-    const dayAvailability = availability.find((a) => a.day === dayOfWeek);
 
-    if (!dayAvailability) {
+    // const dayAvailability = availability.find((a) => a.day === dayOfWeek);
+
+
+
+    // if (!dayAvailability) {
+    //     return res.status(200).json({ slots: [] });
+    // }
+
+    // // إنشاء كل المواعيد الممكنة
+    // const fromMinutes = parseTime(dayAvailability.from);
+    // const toMinutes = parseTime(dayAvailability.to);
+
+    // const allSlots = [];
+    // let current = fromMinutes;
+    // while (current + slotDuration <= toMinutes) {
+    //     const slotStart = addMinutesToDate(date, current);
+    //     allSlots.push(slotStart);
+    //     current += slotDuration + breakMinutes;
+    // }
+
+    const dayAvailabilities = availability.filter((a) => a.day === dayOfWeek);
+
+    if (!dayAvailabilities.length) {
         return res.status(200).json({ slots: [] });
     }
 
-    // إنشاء كل المواعيد الممكنة
-    const fromMinutes = parseTime(dayAvailability.from);
-    const toMinutes = parseTime(dayAvailability.to);
-
     const allSlots = [];
-    let current = fromMinutes;
-    while (current + slotDuration <= toMinutes) {
-        const slotStart = addMinutesToDate(date, current);
-        allSlots.push(slotStart);
-        current += slotDuration + breakMinutes;
-    }
 
+    // dayAvailabilities.forEach(({ from, to }) => {
+    //     const fromMinutes = parseTime(from);
+    //     const toMinutes = parseTime(to);
+    //     let current = fromMinutes;
+
+    //     while (current + slotDuration <= toMinutes) {
+    //         const slotStart = addMinutesToDate(date, current);
+    //         allSlots.push(slotStart);
+    //         current += slotDuration + breakMinutes;
+    //     }
+    // });
+    const now = new Date();
+    const isToday = new Date(date).toDateString() === now.toDateString();
+
+    dayAvailabilities.forEach(({ from, to }) => {
+        const fromMinutes = parseTime(from);
+        const toMinutes = parseTime(to);
+        let current = fromMinutes;
+
+        while (current + slotDuration <= toMinutes) {
+            const slotStart = addMinutesToDate(date, current);
+
+            // إذا كان اليوم هو اليوم الحالي، فتأكد أن التوقيت في المستقبل
+            if (!isToday || slotStart > now) {
+                allSlots.push(slotStart);
+            }
+
+            current += slotDuration + breakMinutes;
+        }
+    });
     // تحديد بداية ونهاية اليوم
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -354,8 +396,8 @@ exports.getAvailableSlots = catchAsync(async (req, res, next) => {
         date: { $gte: startOfDay, $lte: endOfDay },
         status: { $in: ['pending', 'confirmed'] },
     });
-
-    const bookedTimes = booked.map((c) => c.date.toISOString().slice(11, 16)); // "HH:mm"
+    // edit
+    const bookedTimes = booked.map((c) => c.date.toISOString().slice(11, 16))
 
     // إعادة جميع الأوقات مع حالتها
     const slotsWithStatus = allSlots.map((slot) => {
@@ -365,6 +407,19 @@ exports.getAvailableSlots = catchAsync(async (req, res, next) => {
             isBooked: bookedTimes.includes(timeStr),
         };
     });
+
+
+
+    // const bookedTimes = booked.map(c => new Date(c.date).getTime());
+
+    // const slotsWithStatus = allSlots.map(slot => {
+    //     const isBooked = bookedTimes.includes(slot.getTime());
+    //     return {
+    //         time: slot.toISOString(),
+    //         isBooked,
+    //     };
+    // });
+
 
     res.status(200).json({
         status: "success",

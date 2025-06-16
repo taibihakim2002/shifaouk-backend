@@ -112,6 +112,49 @@ exports.doctorCreateAppointmentReport = catchAsync(async (req, res, next) => {
                 { session }
             );
         }
+        else if (finalConsultationStatus === "cancelled") {
+            const patientWallet = await Wallet.findOne({ user: consultation.patient._id }).session(session);
+            const platformUser = await User.findOne({ email: "platform@yourapp.com" }).session(session);
+            const platformWallet = await Wallet.findOne({ user: platformUser._id }).session(session);
+
+            const amount = consultation.patientPaidAmount;
+
+            if (!platformWallet || platformWallet.balance < amount) {
+                throw new AppError("رصيد المنصة غير كافٍ لإرجاع المبلغ للمريض", 500);
+            }
+
+            // تحويل المبلغ
+            platformWallet.balance -= amount;
+            patientWallet.balance += amount;
+
+            await platformWallet.save({ session });
+            await patientWallet.save({ session });
+
+            await Transaction.create(
+                [{
+                    user: platformUser._id,
+                    type: "refund",
+                    amount: -amount,
+                    balanceAfter: platformWallet.balance,
+                    relatedConsultation: consultation._id,
+                    note: `تم إرجاع ${amount} دج للمريض ${consultation.patient.fullName?.first} بسبب إلغاء الاستشارة.`,
+                }],
+                { session }
+            );
+
+            await Transaction.create(
+                [{
+                    user: consultation.patient._id,
+                    type: "consultation_refund",
+                    amount: amount,
+                    balanceAfter: patientWallet.balance,
+                    relatedConsultation: consultation._id,
+                    note: `استرداد مبلغ الاستشارة الملغاة مع الطبيب ${consultation.doctor.fullName?.first}`,
+                }],
+                { session }
+            );
+        }
+
 
         await session.commitTransaction();
         session.endSession();

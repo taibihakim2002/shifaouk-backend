@@ -103,6 +103,7 @@ exports.getDoctorConsultations = catchAsync(async (req, res, next) => {
 })
 exports.getConsultationById = catchAsync(async (req, res, next) => {
     const { id } = req.params
+    console.log(id)
     const consultation = await Consultation.findById(id).populate("patient")
     if (!consultation) {
         return next(new AppError("No Consultations found", 404))
@@ -112,29 +113,45 @@ exports.getConsultationById = catchAsync(async (req, res, next) => {
 
 exports.approveConsultation = catchAsync(async (req, res, next) => {
     const { consultationId } = req.params;
-    const doctorId = req.user.id; // تأكد أن middleware auth يضيف req.user
+    const doctorId = req.user.id;
 
     const consultation = await Consultation.findById(consultationId);
 
     if (!consultation) {
-        return res.status(404).json({ status: "fail", message: "consultation not found  " });
+        return res.status(404).json({ status: "fail", message: "consultation not found" });
     }
 
-    // تحقق من أن الطبيب هو نفسه الذي يملك الاستشارة
     if (consultation.doctor.toString() !== doctorId) {
         return res.status(403).json({ status: "fail", message: "غير مصرح لك بقبول هذه الاستشارة" });
     }
 
-    // تحقق من الحالة
     if (consultation.status !== "pending") {
         return res.status(400).json({ status: "fail", message: "لا يمكن تعديل هذه الاستشارة لأنها ليست قيد الانتظار" });
     }
 
-    consultation.status = "confirmed";
-    await consultation.save();
+    // ✅ إنشاء رابط الاجتماع
+    const meetingLink = `https://meet.jit.si/consultation-${consultation._id}`;
 
-    res.status(200).json({ status: "success", message: "تم تأكيد الاستشارة", data: consultation });
+    // ✅ تحديث الحالة والرابط مباشرة
+    const updatedConsultation = await Consultation.findByIdAndUpdate(
+        consultationId,
+        {
+            status: "confirmed",
+            meetingLink: meetingLink,
+        },
+        { new: true } // لإرجاع النسخة المحدثة
+    );
+
+    res.status(200).json({
+        status: "success",
+        message: "تم تأكيد الاستشارة",
+        data: {
+            consultation: updatedConsultation,
+            meetingLink
+        }
+    });
 });
+
 exports.rejectConsultation = catchAsync(async (req, res, next) => {
     const { consultationId } = req.params;
     const doctorId = req.user.id;
