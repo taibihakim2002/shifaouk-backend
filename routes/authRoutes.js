@@ -24,7 +24,7 @@ router.post(
 
 router.post("/register/admin", onlyFrontend, registerAdmin)
 
-router.use(protect)
+
 
 
 router.post("/logout", onlyFrontend, logout)

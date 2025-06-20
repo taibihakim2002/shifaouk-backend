@@ -111,6 +111,8 @@ exports.getConsultationById = catchAsync(async (req, res, next) => {
     res.status(200).json({ status: "success", data: consultation })
 })
 
+const Conversation = require("../models/ConversationModel");
+
 exports.approveConsultation = catchAsync(async (req, res, next) => {
     const { consultationId } = req.params;
     const doctorId = req.user.id;
@@ -126,31 +128,54 @@ exports.approveConsultation = catchAsync(async (req, res, next) => {
     }
 
     if (consultation.status !== "pending") {
-        return res.status(400).json({ status: "fail", message: "لا يمكن تعديل هذه الاستشارة لأنها ليست قيد الانتظار" });
+        return res.status(400).json({
+            status: "fail",
+            message: "لا يمكن تعديل هذه الاستشارة لأنها ليست قيد الانتظار"
+        });
     }
 
     // ✅ إنشاء رابط الاجتماع
     const meetingLink = `https://meet.jit.si/consultation-${consultation._id}`;
 
-    // ✅ تحديث الحالة والرابط مباشرة
+    // ✅ تحديث الاستشارة للحالة المؤكدة
     const updatedConsultation = await Consultation.findByIdAndUpdate(
         consultationId,
         {
             status: "confirmed",
-            meetingLink: meetingLink,
+            meetingLink,
         },
-        { new: true } // لإرجاع النسخة المحدثة
+        { new: true }
     );
+
+    // ✅ حساب تاريخ انتهاء المحادثة (بعد 7 أيام من تاريخ الاستشارة)
+    const expiresAt = new Date(consultation.date);
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+
+    // expiresAt.setMinutes(expiresAt.getMinutes() + 30);
+
+    // ✅ التأكد من عدم وجود محادثة مسبقة لهذه الاستشارة
+    let conversation = await Conversation.findOne({ consultation: consultation._id });
+    if (!conversation) {
+        conversation = await Conversation.create({
+            consultation: consultation._id,
+            doctor: consultation.doctor,
+            patient: consultation.patient,
+            expiresAt: expiresAt,
+        });
+    }
 
     res.status(200).json({
         status: "success",
-        message: "تم تأكيد الاستشارة",
+        message: "تم تأكيد الاستشارة وإنشاء المحادثة",
         data: {
             consultation: updatedConsultation,
-            meetingLink
-        }
+            conversation,
+            meetingLink,
+        },
     });
 });
+
 
 exports.rejectConsultation = catchAsync(async (req, res, next) => {
     const { consultationId } = req.params;
